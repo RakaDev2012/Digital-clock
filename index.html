@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0c0c1d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Digital Clock - Multi Timezone</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(145deg, #0a0a1a 0%, #1a1a3e 50%, #0a0a1a 100%);
+            font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            padding: 12px;
+            touch-action: manipulation;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: 
+                radial-gradient(1.5px 1.5px at 10% 20%, rgba(255,255,255,0.4), transparent),
+                radial-gradient(1.5px 1.5px at 30% 60%, rgba(255,255,255,0.3), transparent),
+                radial-gradient(1.5px 1.5px at 50% 10%, rgba(255,255,255,0.5), transparent),
+                radial-gradient(1.5px 1.5px at 70% 80%, rgba(255,255,255,0.3), transparent),
+                radial-gradient(1.5px 1.5px at 90% 40%, rgba(255,255,255,0.4), transparent);
+            background-size: 200px 200px;
+            opacity: 0.5;
+            animation: twinkle 5s ease-in-out infinite alternate;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.3; transform: scale(1); }
+            100% { opacity: 0.7; transform: scale(1.1); }
+        }
+
+        .glow-effect {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .glow-1 { width: 200px; height: 200px; background: #00d4ff; top: -80px; right: -80px; }
+        .glow-2 { width: 150px; height: 150px; background: #00ff88; bottom: -50px; left: -50px; }
+
+        /* ===== LOADING SCREEN ===== */
+        .loading-screen {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(145deg, #0a0a1a 0%, #1a1a3e 50%, #0a0a1a 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .loading-screen.hidden {
+            opacity: 0;
+            transform: scale(1.1);
+            pointer-events: none;
+        }
+
+        .loading-screen .logo {
+            font-size: 64px;
+            margin-bottom: 20px;
+            animation: logoPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes logoPulse {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.1) rotate(5deg); }
+        }
+
+        .loading-screen .title {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 18px;
+            letter-spacing: 6px;
+            font-weight: 300;
+            margin-bottom: 30px;
+        }
+
+        .spinner-container {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.05);
+            border-top: 3px solid #00d4ff;
+            border-right: 3px solid #00ff88;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: rgba(255, 255, 255, 0.2);
+            font-size: 12px;
+            letter-spacing: 3px;
+            font-weight: 300;
+            animation: textPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes textPulse {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.6; }
+        }
+
+        .loading-dots {
+            display: flex;
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        .loading-dots .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            animation: dotBounce 1.4s ease-in-out infinite;
+        }
+
+        .loading-dots .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .loading-dots .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        .loading-dots .dot:nth-child(4) {
+            animation-delay: 0.6s;
+        }
+
+        @keyframes dotBounce {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.2; }
+            40% { transform: scale(1.2); opacity: 0.8; background: #00d4ff; }
+        }
+
+        /* ===== APP CONTAINER ===== */
+        .app-container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 440px;
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 32px;
+            padding: 30px 24px 28px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.06);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+            animation: appIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s forwards;
+        }
+
+        @keyframes appIn {
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            flex-shrink: 0;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-left .icon {
+            font-size: 20px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.1); }
+        }
+
+        .header-left h1 {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+            font-weight: 400;
+            letter-spacing: 3px;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .header-right button {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.5);
+            padding: 6px 14px;
+            border-radius: 10px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            touch-action: manipulation;
+            white-space: nowrap;
+        }
+
+        .header-right button:active {
+            transform: scale(0.92);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .header-right button.active {
+            background: rgba(0, 212, 255, 0.12);
+            border-color: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+        }
+
+        .header-right .timezone-btn {
+            background: rgba(255, 215, 0, 0.08);
+            border-color: rgba(255, 215, 0, 0.15);
+            color: #ffd93d;
+            font-weight: 600;
+        }
+
+        /* ===== TIME DISPLAY ===== */
+        .time-display {
+            text-align: center;
+            padding: 30px 0 20px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .time-display .timezone-label {
+            font-size: 12px;
+            color: rgba(255, 215, 0, 0.4);
+            letter-spacing: 3px;
+            margin-bottom: 8px;
+            font-family: -apple-system, sans-serif;
+        }
+
+        .time-display .time {
+            font-size: clamp(72px, 20vw, 110px);
+            font-weight: 800;
+            background: linear-gradient(135deg, #00d4ff 0%, #00ff88 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 80px rgba(0, 212, 255, 0.15);
+            letter-spacing: 4px;
+            line-height: 1;
+            padding: 10px 0;
+        }
+
+        .time-display .date {
+            font-size: clamp(14px, 3.5vw, 18px);
+            color: rgba(255, 255, 255, 0.4);
+            margin-top: 8px;
+            letter-spacing: 2px;
+            font-weight: 300;
+        }
+
+        .time-display .gmt-offset {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.15);
+            margin-top: 6px;
+            letter-spacing: 2px;
+            font-family: -apple-system, sans-serif;
+        }
+
+        /* ===== SECONDS INDICATOR ===== */
+        .seconds-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .seconds-indicator .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .seconds-indicator .dot.active {
+            background: #00d4ff;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+            transform: scale(1.2);
+        }
+
+        /* ===== MODAL ===== */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            animation: fadeIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.92); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-content {
+            background: linear-gradient(145deg, #1a1a3e 0%, #2a2a5e 100%);
+            padding: 30px 24px 26px;
+            border-radius: 28px;
+            max-width: 420px;
+            width: 100%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .modal-content h2 {
+            color: white;
+            text-align: center;
+            margin-bottom: 18px;
+            font-weight: 400;
+            font-size: 22px;
+            letter-spacing: 2px;
+        }
+
+        /* ===== SEARCH BOX ===== */
+        .search-box {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            color: white;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+            margin-bottom: 18px;
+            font-family: -apple-system, sans-serif;
+        }
+
+        .search-box:focus {
+            border-color: #ffd93d;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.05);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .search-box::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* ===== TIMEZONE LIST ===== */
+        .timezone-list-container {
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 0 -4px;
+            padding: 0 4px;
+        }
+
+        .timezone-list-container::-webkit-scrollbar {
+            width: 3px;
+        }
+        .timezone-list-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+        }
+        .timezone-list-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .timezone-group {
+            margin-bottom: 12px;
+        }
+
+        .timezone-group .group-label {
+            color: rgba(255, 215, 0, 0.4);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            padding: 6px 0 4px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            margin-bottom: 4px;
+        }
+
+        .timezone-group .group-label.hidden {
+            display: none;
+        }
+
+        .timezone-item {
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            margin-bottom: 3px;
+        }
+
+        .timezone-item:active {
+            transform: scale(0.97);
+        }
+
+        .timezone-item:hover {
+            background: rgba(255, 215, 0, 0.05);
+            border-color: rgba(255, 215, 0, 0.1);
+        }
+
+        .timezone-item.selected {
+            background: rgba(255, 215, 0, 0.08);
+            border-color: rgba(255, 215, 0, 0.15);
+            color: #ffd93d;
+        }
+
+        .timezone-item.hidden {
+            display: none;
+        }
+
+        .timezone-item .tz-name {
+            font-weight: 500;
+        }
+
+        .timezone-item .tz-offset {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.2);
+            font-family: 'Courier New', monospace;
+        }
+
+        .timezone-item.selected .tz-offset {
+            color: rgba(255, 215, 0, 0.4);
+        }
+
+        .timezone-item .tz-check {
+            display: none;
+            color: #ffd93d;
+            margin-left: 8px;
+        }
+
+        .timezone-item.selected .tz-check {
+            display: inline;
+        }
+
+        .timezone-item .tz-cities {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.15);
+            margin-top: 2px;
+        }
+
+        .no-search-results {
+            text-align: center;
+            padding: 30px 20px;
+            color: rgba(255, 255, 255, 0.15);
+        }
+
+        .no-search-results .icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+            opacity: 0.5;
+        }
+        .no-search-results p {
+            font-size: 13px;
+            letter-spacing: 0.5px;
+        }
+
+        .modal-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .modal-buttons button {
+            padding: 14px;
+            border: none;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            touch-action: manipulation;
+        }
+
+        .modal-buttons button:active {
+            transform: scale(0.94);
+        }
+
+        .modal-buttons .btn-save {
+            background: linear-gradient(135deg, #ffd93d, #ff6b6b);
+            color: #000;
+        }
+
+        .modal-buttons .btn-save:active {
+            box-shadow: 0 0 40px rgba(255, 215, 0, 0.2);
+        }
+
+        .modal-buttons .btn-cancel {
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .modal-buttons .btn-cancel:active {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 16px;
+            font-size: 14px;
+            z-index: 2000;
+            border: 1px solid rgba(255,255,255,0.06);
+            animation: fadeIn 0.3s ease;
+            max-width: 85%;
+            text-align: center;
+            pointer-events: none;
+            font-family: -apple-system, sans-serif;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 380px) {
+            .app-container { padding: 20px 16px 20px; border-radius: 24px; }
+            .modal-content { padding: 20px 16px 18px; }
+            .header-left h1 { font-size: 12px; }
+            .header-right button { font-size: 9px; padding: 4px 10px; }
+            .time-display .time { font-size: clamp(54px, 16vw, 80px); }
+            .loading-screen .logo { font-size: 48px; }
+            .loading-screen .title { font-size: 14px; }
+            .search-box { font-size: 12px; padding: 10px 14px; }
+        }
+
+        @media (min-width: 600px) {
+            .app-container { padding: 40px 35px 35px; border-radius: 40px; }
+            .time-display .time { font-size: 120px; }
+        }
+
+        @media (max-height: 600px) {
+            .app-container { padding: 16px 20px 16px; }
+            .time-display { padding: 12px 0 10px; }
+            .time-display .time { font-size: clamp(48px, 14vw, 70px); }
+            .time-display .date { font-size: 12px; }
+            .seconds-indicator { margin-top: 8px; padding-top: 8px; }
+        }
+
+        .no-scroll { overflow: hidden; position: fixed; width: 100%; }
+    </style>
+</head>
+<body>
+    <!-- ===== LOADING SCREEN ===== -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="logo">⏰</div>
+        <div class="title">DIGITAL CLOCK</div>
+        <div class="spinner-container">
+            <div class="spinner"></div>
+        </div>
+        <div class="loading-text">LOADING</div>
+        <div class="loading-dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+    </div>
+
+    <div class="glow-effect glow-1"></div>
+    <div class="glow-effect glow-2"></div>
+
+    <!-- ===== APP CONTAINER ===== -->
+    <div class="app-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <span class="icon">⏰</span>
+                <h1>DIGITAL CLOCK</h1>
+            </div>
+            <div class="header-right">
+                <button id="formatToggle" class="active">24H</button>
+                <button id="timezoneBtn" class="timezone-btn">🌍 GMT</button>
+            </div>
+        </div>
+
+        <!-- Time Display -->
+        <div class="time-display">
+            <div class="timezone-label" id="timezoneLabel">UTC+7 (WIB)</div>
+            <div class="time" id="currentTime">00:00:00</div>
+            <div class="date" id="currentDate">Monday, 01 January 2024</div>
+            <div class="gmt-offset" id="gmtOffset">GMT+07:00</div>
+        </div>
+
+        <!-- Seconds Indicator -->
+        <div class="seconds-indicator" id="secondsIndicator">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- ===== TIMEZONE MODAL ===== -->
+    <div class="modal" id="timezoneModal">
+        <div class="modal-content">
+            <h2>🌍 Select Timezone</h2>
+            <input type="text" class="search-box" id="timezoneSearch" placeholder="🔍 Search city or GMT...">
+            <div class="timezone-list-container" id="timezoneListContainer">
+                <div id="timezoneList"></div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-save" id="saveTimezoneBtn">💾 Save</button>
+                <button class="btn-cancel" id="cancelTimezoneBtn">✕ Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== TIMEZONE DATA (GROUPED) =====
+        const TIMEZONE_GROUPS = {
+            'UTC-12': { offset: -12, cities: ['Baker Island'] },
+            'UTC-11': { offset: -11, cities: ['American Samoa', 'Niue'] },
+            'UTC-10': { offset: -10, cities: ['Hawaii', 'Tahiti'] },
+            'UTC-9': { offset: -9, cities: ['Alaska'] },
+            'UTC-8': { offset: -8, cities: ['Los Angeles', 'Vancouver'] },
+            'UTC-7': { offset: -7, cities: ['Denver', 'Phoenix'] },
+            'UTC-6': { offset: -6, cities: ['Chicago', 'Mexico City'] },
+            'UTC-5': { offset: -5, cities: ['New York', 'Bogota', 'Lima'] },
+            'UTC-4': { offset: -4, cities: ['Caracas', 'Santiago'] },
+            'UTC-3': { offset: -3, cities: ['Brasilia', 'Buenos Aires'] },
+            'UTC-2': { offset: -2, cities: ['Mid-Atlantic'] },
+            'UTC-1': { offset: -1, cities: ['Azores', 'Cape Verde'] },
+            'UTC+0': { offset: 0, cities: ['London', 'Lisbon', 'Dakar'] },
+            'UTC+1': { offset: 1, cities: ['Paris', 'Berlin', 'Rome', 'Madrid', 'Lagos'] },
+            'UTC+2': { offset: 2, cities: ['Athens', 'Cairo', 'Johannesburg', 'Istanbul'] },
+            'UTC+3': { offset: 3, cities: ['Moscow', 'Riyadh', 'Nairobi'] },
+            'UTC+3:30': { offset: 3.5, cities: ['Tehran'] },
+            'UTC+4': { offset: 4, cities: ['Dubai', 'Baku'] },
+            'UTC+4:30': { offset: 4.5, cities: ['Kabul'] },
+            'UTC+5': { offset: 5, cities: ['Karachi', 'Tashkent'] },
+            'UTC+5:30': { offset: 5.5, cities: ['India (IST)', 'Colombo'] },
+            'UTC+5:45': { offset: 5.75, cities: ['Kathmandu'] },
+            'UTC+6': { offset: 6, cities: ['Dhaka', 'Almaty'] },
+            'UTC+6:30': { offset: 6.5, cities: ['Yangon'] },
+            'UTC+7': { offset: 7, cities: ['Jakarta (WIB)', 'Bangkok', 'Hanoi'] },
+            'UTC+8': { offset: 8, cities: ['Singapore', 'Kuala Lumpur', 'Beijing', 'Hong Kong', 'Taipei', 'Perth'] },
+            'UTC+8:45': { offset: 8.75, cities: ['Eucla'] },
+            'UTC+9': { offset: 9, cities: ['Tokyo', 'Seoul'] },
+            'UTC+9:30': { offset: 9.5, cities: ['Adelaide', 'Darwin'] },
+            'UTC+10': { offset: 10, cities: ['Sydney', 'Melbourne', 'Brisbane'] },
+            'UTC+10:30': { offset: 10.5, cities: ['Lord Howe'] },
+            'UTC+11': { offset: 11, cities: ['Solomon Is.', 'Noumea'] },
+            'UTC+12': { offset: 12, cities: ['Auckland', 'Fiji'] },
+            'UTC+13': { offset: 13, cities: ['Samoa', 'Tonga'] },
+            'UTC+14': { offset: 14, cities: ['Line Islands'] }
+        };
+
+        // ===== DATA =====
+        let is24Hour = true;
+        let currentTimezone = { offset: 7, label: 'UTC+7', cities: ['Jakarta (WIB)', 'Bangkok', 'Hanoi'] };
+        let selectedTimezone = null;
+        const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        // ===== DOM REFS =====
+        const loadingScreen = document.getElementById('loadingScreen');
+        const formatToggle = document.getElementById('formatToggle');
+        const timezoneBtn = document.getElementById('timezoneBtn');
+        const timezoneModal = document.getElementById('timezoneModal');
+        const timezoneList = document.getElementById('timezoneList');
+        const timezoneSearch = document.getElementById('timezoneSearch');
+        const saveTimezoneBtn = document.getElementById('saveTimezoneBtn');
+        const cancelTimezoneBtn = document.getElementById('cancelTimezoneBtn');
+        const currentTimeEl = document.getElementById('currentTime');
+        const currentDateEl = document.getElementById('currentDate');
+        const timezoneLabel = document.getElementById('timezoneLabel');
+        const gmtOffset = document.getElementById('gmtOffset');
+        const secondsIndicator = document.getElementById('secondsIndicator');
+
+        // ===== HIDE LOADING SCREEN =====
+        function hideLoading() {
+            setTimeout(() => {
+                loadingScreen.classList.add('hidden');
+            }, 800);
+        }
+
+        // ===== TIMEZONE FUNCTIONS =====
+        function getTimeInTimezone(offset) {
+            const now = new Date();
+            const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+            return new Date(utc + (offset * 3600000));
+        }
+
+        function formatTimeForTimezone(date, is24H) {
+            let hours = date.getHours();
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            
+            if (is24H) {
+                return String(hours).padStart(2, '0') + ':' + minutes + ':' + seconds;
+            } else {
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12 || 12;
+                return String(hours).padStart(2, '0') + ':' + minutes + ':' + seconds + ' ' + ampm;
+            }
+        }
+
+        function formatDateForTimezone(date) {
+            return `${DAYS_FULL[date.getDay()]}, ${String(date.getDate()).padStart(2, '0')} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+        }
+
+        function updateClock() {
+            const date = getTimeInTimezone(currentTimezone.offset);
+            
+            const timeStr = formatTimeForTimezone(date, is24Hour);
+            const dateStr = formatDateForTimezone(date);
+            
+            currentTimeEl.textContent = timeStr;
+            currentDateEl.textContent = dateStr;
+            
+            const offsetStr = currentTimezone.offset >= 0 ? 
+                `+${currentTimezone.offset}` : 
+                `${currentTimezone.offset}`;
+            const label = currentTimezone.cities && currentTimezone.cities.length > 0 ?
+                `${currentTimezone.label} (${currentTimezone.cities[0]})` :
+                currentTimezone.label;
+            timezoneLabel.textContent = label;
+            
+            const gmtStr = currentTimezone.offset >= 0 ?
+                `GMT+${String(currentTimezone.offset).replace('.', ':')}0` :
+                `GMT${String(currentTimezone.offset).replace('.', ':')}0`;
+            gmtOffset.textContent = gmtStr;
+
+            // Update seconds indicator
+            const seconds = date.getSeconds();
+            const dots = secondsIndicator.querySelectorAll('.dot');
+            dots.forEach((dot, index) => {
+                dot.classList.toggle('active', index < seconds / 5);
+            });
+        }
+
+        // ===== TIMEZONE MODAL WITH SEARCH =====
+        function renderTimezoneList(searchTerm = '') {
+            let html = '';
+            let hasResults = false;
+            const search = searchTerm.toLowerCase().trim();
+
+            for (const [label, group] of Object.entries(TIMEZONE_GROUPS)) {
+                const isSelected = selectedTimezone && 
+                    selectedTimezone.offset === group.offset &&
+                    selectedTimezone.label === label;
+                
+                const labelMatch = label.toLowerCase().includes(search);
+                const citiesMatch = group.cities.some(city => 
+                    city.toLowerCase().includes(search)
+                );
+                const offsetMatch = String(group.offset).includes(search);
+                
+                const isVisible = !search || labelMatch || citiesMatch || offsetMatch;
+                
+                if (isVisible) hasResults = true;
+
+                const citiesDisplay = group.cities.length > 0 ? 
+                    ` • ${group.cities.slice(0, 3).join(', ')}${group.cities.length > 3 ? '...' : ''}` : '';
+                
+                html += `
+                    <div class="timezone-group ${!isVisible ? 'hidden' : ''}">
+                        <div class="group-label ${!isVisible ? 'hidden' : ''}">${label}</div>
+                        <div class="timezone-item ${isSelected ? 'selected' : ''} ${!isVisible ? 'hidden' : ''}" 
+                             data-offset="${group.offset}" 
+                             data-label="${label}"
+                             data-cities='${JSON.stringify(group.cities)}'>
+                            <span>
+                                <span class="tz-name">${group.cities[0] || label}</span>
+                                <div class="tz-cities">${citiesDisplay}</div>
+                            </span>
+                            <span>
+                                <span class="tz-offset">${group.offset >= 0 ? '+' : ''}${group.offset}</span>
+                                <span class="tz-check"> ✓</span>
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (!hasResults && search) {
+                html = `
+                    <div class="no-search-results">
+                        <div class="icon">🔍</div>
+                        <p>No results found for "${search}"</p>
+                    </div>
+                `;
+            }
+
+            timezoneList.innerHTML = html;
+
+            document.querySelectorAll('.timezone-item:not(.hidden)').forEach(el => {
+                el.addEventListener('click', () => {
+                    document.querySelectorAll('.timezone-item').forEach(e => e.classList.remove('selected'));
+                    el.classList.add('selected');
+                    selectedTimezone = {
+                        offset: parseFloat(el.dataset.offset),
+                        label: el.dataset.label,
+                        cities: JSON.parse(el.dataset.cities)
+                    };
+                });
+            });
+        }
+
+        function openTimezoneModal() {
+            selectedTimezone = { ...currentTimezone };
+            timezoneSearch.value = '';
+            renderTimezoneList('');
+            timezoneModal.classList.add('show');
+            document.body.classList.add('no-scroll');
+            setTimeout(() => timezoneSearch.focus(), 300);
+        }
+
+        function closeTimezoneModal() {
+            timezoneModal.classList.remove('show');
+            document.body.classList.remove('no-scroll');
+            timezoneSearch.value = '';
+        }
+
+        function saveTimezone() {
+            if (selectedTimezone) {
+                currentTimezone = { ...selectedTimezone };
+                // Save to localStorage
+                localStorage.setItem('timezone', JSON.stringify(currentTimezone));
+                updateClock();
+                showToast(`🌍 Timezone changed to ${currentTimezone.label}`);
+                if (navigator.vibrate) navigator.vibrate(20);
+                closeTimezoneModal();
+            }
+        }
+
+        // ===== LOAD TIMEZONE =====
+        function loadTimezone() {
+            try {
+                const savedTz = localStorage.getItem('timezone');
+                if (savedTz) {
+                    const tz = JSON.parse(savedTz);
+                    currentTimezone = tz;
+                }
+            } catch (e) {
+                // Use default
+            }
+            updateClock();
+        }
+
+        // ===== TOAST =====
+        function showToast(message) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        // ===== FORMAT TOGGLE =====
+        function toggleFormat() {
+            is24Hour = !is24Hour;
+            formatToggle.classList.toggle('active');
+            formatToggle.textContent = is24Hour ? '24H' : '12H';
+            updateClock();
+            if (navigator.vibrate) navigator.vibrate(10);
+        }
+
+        // ===== EVENT LISTENERS =====
+        formatToggle.addEventListener('click', toggleFormat);
+        timezoneBtn.addEventListener('click', openTimezoneModal);
+        saveTimezoneBtn.addEventListener('click', saveTimezone);
+        cancelTimezoneBtn.addEventListener('click', closeTimezoneModal);
+
+        timezoneSearch.addEventListener('input', (e) => {
+            renderTimezoneList(e.target.value);
+        });
+
+        timezoneModal.addEventListener('click', (e) => {
+            if (e.target === timezoneModal) closeTimezoneModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeTimezoneModal();
+            }
+        });
+
+        // ===== INIT =====
+        loadTimezone();
+        setInterval(updateClock, 1000);
+        hideLoading();
+
+        console.log('🕐 Digital Clock - Multi Timezone ready!');
+        console.log(`🌍 Timezone: ${currentTimezone.label}`);
+
+        // ===== PREVENT ZOOM =====
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) e.preventDefault();
+            lastTouchEnd = now;
+        }, false);
+    </script>
+</body>
+</html>
